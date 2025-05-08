@@ -2,7 +2,6 @@ const express = require('express');
 const app = express();
 const PORT = 1229;
 const router = require('./routes/posts');
-const mysql = require('./database/mysql');
 
 app.use(express.static('public'));
 
