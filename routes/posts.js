@@ -1,37 +1,59 @@
 const express = require('express');
 const router = express.Router();
-const postsData = require('../utils/posts');
+const db = require('../database/mysql');
 
+router.get('/', (req, res) => {
+  db.query('SELECT * FROM posts', (err, results) => {
+    if (err) 
+      return res.status(500).json({ error: err.message });
 
-router.get('/', (_, res) => {
-  res.json(postsData);
+    res.json(results);
+  });
 });
 
-router.get('/:slug', (req, res) => {
-  const postSlug = req.params.slug;
-  const requestedItem = postsData.find(element => element.slug === postSlug);
+router.get('/:id', (req, res) => {
+  const postId = req.params.id;
 
-  if (!requestedItem) return res.status(404).json({ error: `Slag '${postSlug}' non trovato` });
+  const sql = `
+    SELECT 
+      posts.*, GROUP_CONCAT(tags.label) AS tags
+    FROM 
+      posts
+    JOIN 
+      post_tag ON posts.id = post_tag.post_id
+    JOIN
+      tags ON post_tag.tag_id = tags.id
+    WHERE
+      posts.id = ?
+    GROUP BY 
+      posts.id
+  `;
 
-  res.json(requestedItem);
+  db.query(sql, [postId], (err, results) => {
+      if (err) 
+        return res.status(500).json({ error: err.message });
+      
+      if (results.length === 0) 
+        return res.status(404).json({ error: 'Post non trovato' });
+      
+      const post = results[0];
+      post.tags = post.tags ? post.tags.split(',') : [];
+      res.json(post);
+    }
+  );
 });
 
-
-router.post('/', function (req, res) {
-  res.send('Aggiunto nuovo dolce: ' + req.params.slug);
+router.delete('/:id', (req, res) => {
+  const postId = req.params.id;
+  db.query('DELETE FROM posts WHERE id = ?', [postId], (err, result) => {
+    if (err) 
+      return res.status(500).json({ error: err.message });
+    
+    if (result.affectedRows === 0) 
+      return res.status(404).json({ error: 'Post non trovato' });
+    
+    res.status(204).send();
+  });
 });
-
-router.put('/:slug', function (req, res) {
-  res.send('[PUT] Modificato dolce: ' + req.params.slug);
-});
-
-router.patch('/:slug', function (req, res) {
-  res.send('[PATCH] Modificato il dolce: ' + req.params.slug);
-});
-
-router.delete('/:slug', function (req, res) {
-  res.send('Eliminato il dolce: ' + req.params.slug);
-});
-
 
 module.exports = router;
